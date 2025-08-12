@@ -642,6 +642,28 @@ static const struct riscv_tune_param optimize_size_tune_info = {
   NULL,						/* loop_align */
 };
 
+/* Costs to use when optimizing for alioth (rv32imfd).  */
+static const struct riscv_tune_param alioth_tune_info = {
+  {COSTS_N_INSNS (2),  COSTS_N_INSNS (2)},	/* fp_add (2 cycles) */
+  {COSTS_N_INSNS (2),  COSTS_N_INSNS (2)},	/* fp_mul (2 cycles) */
+  {COSTS_N_INSNS (12), COSTS_N_INSNS (12)},	/* fp_div (12 cycles for both SF/DF) */
+  {COSTS_N_INSNS (7),  COSTS_N_INSNS (7)},	/* int_mul (7 cycles, only 32bit) */
+  {COSTS_N_INSNS (36), COSTS_N_INSNS (36)},	/* int_div (36 cycles, only 32bit) */
+  1,						/* issue_rate (single issue) */
+  5,						/* branch_cost */
+  2,						/* memory_cost (load 2 cycles) */
+  2,						/* fmv_cost (fp misc 2 cycles) */
+  true,						/* slow_unaligned_access */
+  false,					/* vector_unaligned_access */
+  false,					/* use_divmod_expansion */
+  false,					/* overlap_op_by_pieces */
+  RISCV_FUSE_LUI_ADDI | RISCV_FUSE_AUIPC_ADDI,  /* fusible_ops */
+  NULL,						/* vector cost */
+  NULL,						/* function_align */
+  NULL,						/* jump_align */
+  NULL,						/* loop_align */
+};
+
 static bool riscv_avoid_shrink_wrapping_separate ();
 static tree riscv_handle_fndecl_attribute (tree *, tree, tree, int, bool *);
 static tree riscv_handle_type_attribute (tree *, tree, tree, int, bool *);
