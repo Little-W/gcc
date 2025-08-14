@@ -644,15 +644,15 @@ static const struct riscv_tune_param optimize_size_tune_info = {
 
 /* Costs to use when optimizing for alioth (rv32imfd).  */
 static const struct riscv_tune_param alioth_tune_info = {
-  {COSTS_N_INSNS (2),  COSTS_N_INSNS (2)},	/* fp_add (2 cycles) */
-  {COSTS_N_INSNS (2),  COSTS_N_INSNS (2)},	/* fp_mul (2 cycles) */
-  {COSTS_N_INSNS (12), COSTS_N_INSNS (12)},	/* fp_div (12 cycles for both SF/DF) */
+  {COSTS_N_INSNS (9),  COSTS_N_INSNS (9)},	/* fp_add (fadd/fsub/fmul/fmax/fcvt/fcmp/fclass/sgnj 9 cycles) */
+  {COSTS_N_INSNS (11), COSTS_N_INSNS (11)},	/* fp_mul (fmul/fmadd 9 cycles) */
+  {COSTS_N_INSNS (29), COSTS_N_INSNS (29)},	/* fp_div (fdiv 29 cycles for both SF/DF) */
   {COSTS_N_INSNS (4),  COSTS_N_INSNS (4)},	/* int_mul (4 cycles, only 32bit) */
   {COSTS_N_INSNS (36), COSTS_N_INSNS (36)},	/* int_div (36 cycles, only 32bit) */
   1,						/* issue_rate (single issue) */
   5,						/* branch_cost */
   2,						/* memory_cost (load 2 cycles) */
-  2,						/* fmv_cost (fp misc 2 cycles) */
+  3,						/* fmv_cost (fmisc 3 cycles) */
   true,						/* slow_unaligned_access */
   false,					/* vector_unaligned_access */
   false,					/* use_divmod_expansion */

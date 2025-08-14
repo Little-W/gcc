@@ -1,14 +1,12 @@
 (define_automaton "alioth")
 
 ;; Alioth Core Pipeline Resource Definition
-;; 单发射流水线，独立的 load/store，两个整数乘法单元，两个整数除法单元，浮点单元分杂项/乘加/除法
+;; 单发射流水线，独立的 load/store，两个整数乘法单元，两个整数除法单元，浮点单元统一为 alioth_fpu
 
 (define_cpu_unit "alioth_ex_pipe" "alioth")
 (define_cpu_unit "alioth_idiv0" "alioth")
 (define_cpu_unit "alioth_idiv1" "alioth")
-(define_cpu_unit "alioth_fmisc" "alioth")
-(define_cpu_unit "alioth_fmac" "alioth")
-(define_cpu_unit "alioth_fdiv" "alioth")
+(define_cpu_unit "alioth_fpu" "alioth")
 (define_cpu_unit "alioth_wb_pipe" "alioth")
 
 ;; ALU/逻辑/移位等 (仅支持 IMDF)
@@ -52,7 +50,7 @@
 (and (eq_attr "tune" "alioth")
      (and (eq_attr "type" "idiv")
           (eq_attr "mode" "SI")))
-"alioth_ex_pipe+(alioth_idiv0|alioth_idiv1),(alioth_idiv0*32|alioth_idiv1*32),alioth_wb_pipe")
+"alioth_ex_pipe,(alioth_idiv0*32|alioth_idiv1*32),alioth_wb_pipe")
 
 ;; Popcount and clmul
 (define_insn_reservation "alioth_popcount" 2
@@ -63,31 +61,41 @@
 ;; Floating-point transfer/conversion/comparison
 (define_insn_reservation "alioth_fmisc" 3
 (and (eq_attr "tune" "alioth")
-(eq_attr "type" "mfc,mtc,fcvt,fcvt_i2f,fcvt_f2i,fmove,fcmp"))
-"alioth_ex_pipe+alioth_fmisc,alioth_wb_pipe")
+     (eq_attr "type" "mfc,mtc,fmove,fcmp"))
+"alioth_ex_pipe+alioth_fpu,alioth_fpu,alioth_wb_pipe")
 
-;; Floating-point add/mul/fma - single precision
-(define_insn_reservation "alioth_fmac_sf" 5
+;; Floating-point add/sub
+(define_insn_reservation "alioth_fadd" 9
 (and (eq_attr "tune" "alioth")
-     (and (eq_attr "type" "fadd,fmul,fmadd")
-          (eq_attr "mode" "SF")))
-"alioth_ex_pipe+alioth_fmac,alioth_wb_pipe")
-
-;; Floating-point add/mul/fma - double precision
-(define_insn_reservation "alioth_fmac_df" 7
-(and (eq_attr "tune" "alioth")
-     (and (eq_attr "type" "fadd,fmul,fmadd")
-          (eq_attr "mode" "DF")))
-"alioth_ex_pipe+alioth_fmac,alioth_wb_pipe")
+     (eq_attr "type" "fadd"))
+"alioth_ex_pipe+alioth_fpu,alioth_fpu*7,alioth_wb_pipe")
 
 ;; Floating-point divide
-(define_insn_reservation "alioth_fdiv" 20
+(define_insn_reservation "alioth_fdiv" 29
 (and (eq_attr "tune" "alioth")
-(eq_attr "type" "fdiv"))
-"alioth_ex_pipe+alioth_fdiv,alioth_fdiv*18,alioth_wb_pipe")
+     (eq_attr "type" "fdiv"))
+"alioth_ex_pipe+alioth_fpu,alioth_fpu*27,alioth_wb_pipe")
 
 ;; Floating-point sqrt
-(define_insn_reservation "alioth_fsqrt" 25
+(define_insn_reservation "alioth_fsqrt" 35
 (and (eq_attr "tune" "alioth")
-(eq_attr "type" "fsqrt"))
-"alioth_ex_pipe+alioth_fdiv,alioth_fdiv*23,alioth_wb_pipe")
+     (eq_attr "type" "fsqrt"))
+"alioth_ex_pipe+alioth_fpu,alioth_fpu*33,alioth_wb_pipe")
+
+;; Floating-point mul/fma
+(define_insn_reservation "alioth_fmul" 11
+(and (eq_attr "tune" "alioth")
+     (eq_attr "type" "fmul,fmadd"))
+"alioth_ex_pipe+alioth_fpu,alioth_fpu*9,alioth_wb_pipe")
+
+;; Floating-point cvt_f2i
+(define_insn_reservation "alioth_fcvt_f2i" 6
+(and (eq_attr "tune" "alioth")
+     (eq_attr "type" "fcvt_f2i"))
+"alioth_ex_pipe+alioth_fpu,alioth_fpu*4,alioth_wb_pipe")
+
+;; Floating-point cvt_i2f, fcvt_f2f
+(define_insn_reservation "alioth_fcvt_2f" 7
+(and (eq_attr "tune" "alioth")
+     (eq_attr "type" "fcvt_i2f,fcvt"))
+"alioth_ex_pipe+alioth_fpu,alioth_fpu*5,alioth_wb_pipe")
