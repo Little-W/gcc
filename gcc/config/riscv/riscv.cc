@@ -644,8 +644,8 @@ static const struct riscv_tune_param optimize_size_tune_info = {
 
 /* Costs to use when optimizing for alioth (rv32imfd).  */
 static const struct riscv_tune_param alioth_tune_info = {
-  {COSTS_N_INSNS (9),  COSTS_N_INSNS (9)},	/* fp_add (fadd/fsub/fmul/fmax/fcvt/fcmp/fclass/sgnj 9 cycles) */
-  {COSTS_N_INSNS (11), COSTS_N_INSNS (11)},	/* fp_mul (fmul/fmadd 9 cycles) */
+  {COSTS_N_INSNS (9),  COSTS_N_INSNS (9)},	/* fp_add (fadd/fsub/fmax/fcvt/fcmp/fclass/sgnj 9 cycles) */
+  {COSTS_N_INSNS (11), COSTS_N_INSNS (11)},	/* fp_mul (fmul 11 cycles) */
   {COSTS_N_INSNS (29), COSTS_N_INSNS (29)},	/* fp_div (fdiv 29 cycles for both SF/DF) */
   {COSTS_N_INSNS (4),  COSTS_N_INSNS (4)},	/* int_mul (4 cycles, only 32bit) */
   {COSTS_N_INSNS (36), COSTS_N_INSNS (36)},	/* int_div (36 cycles, only 32bit) */
@@ -663,6 +663,31 @@ static const struct riscv_tune_param alioth_tune_info = {
   NULL,						/* jump_align */
   NULL,						/* loop_align */
 };
+
+// 简单静态预测：Backward Taken, Forward Not Taken
+bool alioth_branch_predicted_p (rtx_insn *insn)
+{
+  if (!insn || !JUMP_P (insn))
+    return false;
+
+  // 仅对条件分支生效；JAL/JALR/间接跳转不在此函数判断范围
+  enum attr_type ty = get_attr_type (insn);
+  if (ty != TYPE_BRANCH)
+    return false;
+
+  rtx label = JUMP_LABEL (insn);
+  if (!label)
+    return false;
+
+  basic_block bb_src = BLOCK_FOR_INSN (insn);
+  basic_block bb_dst = BLOCK_FOR_INSN (label);
+
+  if (!bb_src || !bb_dst)
+    return false;
+
+  // 目的基本块编号小于等于当前块 -> 视为“后向”分支（预测 taken）
+  return (bb_dst->index <= bb_src->index);
+}
 
 static bool riscv_avoid_shrink_wrapping_separate ();
 static tree riscv_handle_fndecl_attribute (tree *, tree, tree, int, bool *);

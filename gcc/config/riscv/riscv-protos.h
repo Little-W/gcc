@@ -835,6 +835,8 @@ const struct riscv_tune_info *
 riscv_parse_tune (const char *, bool);
 const cpu_vector_cost *get_vector_costs ();
 
+extern bool alioth_branch_predicted_p (rtx_insn *insn);
+
 enum
 {
   RISCV_MAJOR_VERSION_BASE = 1000000,
