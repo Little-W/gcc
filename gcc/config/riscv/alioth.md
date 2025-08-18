@@ -27,7 +27,7 @@
 (define_insn_reservation "alioth_load" 2
   (and (eq_attr "tune" "alioth")
        (eq_attr "type" "load"))
-  "alioth_issue+alioth_lsu_rd,alioth_lsu_rd+alioth_wb_pipe")
+  "alioth_issue+alioth_lsu_rd,alioth_wb_pipe")
 
 ;; Store（1 拍；仅占用 issue 和 lsu 写入）
 (define_insn_reservation "alioth_store" 1
@@ -40,7 +40,7 @@
   (and (eq_attr "tune" "alioth")
        (and (eq_attr "type" "fpload")
             (eq_attr "mode" "SF")))
-  "alioth_issue+alioth_lsu_rd,alioth_lsu_rd+alioth_wb_pipe")
+  "alioth_issue+alioth_lsu_rd,alioth_wb_pipe")
 
 (define_insn_reservation "alioth_fpstore_sf" 1
   (and (eq_attr "tune" "alioth")
@@ -53,7 +53,7 @@
   (and (eq_attr "tune" "alioth")
        (and (eq_attr "type" "fpload")
             (eq_attr "mode" "DF")))
-  "alioth_issue+alioth_lsu_rd,alioth_lsu_rd,alioth_lsu_rd+alioth_wb_pipe")
+  "alioth_issue+alioth_lsu_rd,nothing,alioth_wb_pipe")
 
 ;; 双精度浮点写入（2 周期 lsu_wr）
 (define_insn_reservation "alioth_fpstore_df" 2
@@ -71,7 +71,7 @@
             (match_test "alioth_branch_predicted_p (insn)")))
   "alioth_issue")
 
-;; 未被预测覆盖的 branch：5-cycle 前端停顿
+;; 未被预测覆盖的 branch：4-cycle 前端停顿
 (define_insn_reservation "alioth_branch_nopred" 4
   (and (eq_attr "tune" "alioth")
        (and (eq_attr "type" "branch")
@@ -94,7 +94,7 @@
 (define_insn_reservation "alioth_ret" 4
   (and (eq_attr "tune" "alioth")
        (eq_attr "type" "ret"))
-  "alioth_issue+alioth_alu，alioth_wb_pipe+alioth_issue,alioth_issue,alioth_issue")
+  "alioth_issue+alioth_alu,alioth_wb_pipe+alioth_issue,alioth_issue,alioth_issue")
 
 ;; trap（ecall/ebreak）：与未预测分支类似，7-cycle 前端停顿
 (define_insn_reservation "alioth_trap" 7
@@ -150,16 +150,3 @@
   (and (eq_attr "tune" "alioth")
        (eq_attr "type" "fcvt_i2f,fcvt"))
   "alioth_issue+alioth_fpu,alioth_fpu*5,alioth_wb_pipe")
-
-;; ---------------------------
-;; Bypass
-;; ---------------------------
-
-;; 1) ALU → ALU
-(define_bypass 0 "alioth_alu" "alioth_alu")
-
-;; 2) ALU → IMUL
-(define_bypass 0 "alioth_alu" "alioth_imul")
-
-;; 3) ALU → IDIV
-(define_bypass 0 "alioth_alu" "alioth_idivsi")
