@@ -150,3 +150,16 @@
   (and (eq_attr "tune" "alioth")
        (eq_attr "type" "fcvt_i2f,fcvt"))
   "alioth_issue+alioth_fpu,alioth_fpu*5,alioth_wb_pipe")
+
+;; ---------------------------
+;; Bypass
+;; ---------------------------
+
+;; 1) ALU → ALU
+(define_bypass 0 "alioth_alu" "alioth_alu")
+
+;; 2) ALU → IMUL
+(define_bypass 0 "alioth_alu" "alioth_imul")
+
+;; 3) ALU → IDIV
+(define_bypass 0 "alioth_alu" "alioth_idivsi")

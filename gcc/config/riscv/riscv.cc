@@ -650,7 +650,7 @@ static const struct riscv_tune_param alioth_tune_info = {
   {COSTS_N_INSNS (4),  COSTS_N_INSNS (4)},	/* int_mul (4 cycles, only 32bit) */
   {COSTS_N_INSNS (36), COSTS_N_INSNS (36)},	/* int_div (36 cycles, only 32bit) */
   1,						/* issue_rate (single issue) */
-  5,						/* branch_cost */
+  4,						/* branch_cost */
   2,						/* memory_cost (load 2 cycles) */
   3,						/* fmv_cost (fmisc 3 cycles) */
   true,						/* slow_unaligned_access */
