@@ -62,6 +62,18 @@
             (eq_attr "mode" "DF")))
   "alioth_issue+alioth_lsu_wr,alioth_lsu_wr")
 
+;; 通用浮点读取保底规则（覆盖其他模式）
+(define_insn_reservation "alioth_fpload_generic" 2
+  (and (eq_attr "tune" "alioth")
+       (eq_attr "type" "fpload"))
+  "alioth_issue+alioth_lsu_rd,alioth_wb_pipe")
+
+;; 通用浮点写入保底规则（覆盖其他模式）
+(define_insn_reservation "alioth_fpstore_generic" 1
+  (and (eq_attr "tune" "alioth")
+       (eq_attr "type" "fpstore"))
+  "alioth_issue+alioth_lsu_wr")
+
 ;; ---- 控制转移：按重定向气泡建模 ----
 
 ;; 被预测覆盖的 branch：无额外停顿（仅 1 拍占用 issue）
