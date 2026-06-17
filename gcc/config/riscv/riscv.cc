@@ -642,8 +642,8 @@ static const struct riscv_tune_param optimize_size_tune_info = {
   NULL,						/* loop_align */
 };
 
-/* Costs to use when optimizing for alioth (rv32imfd).  */
-static const struct riscv_tune_param alioth_tune_info = {
+/* Costs to use when optimizing for alkaid (rv64im).  */
+static const struct riscv_tune_param alkaid_tune_info = {
   {COSTS_N_INSNS (9),  COSTS_N_INSNS (9)},	/* fp_add (fadd/fsub/fmax/fcvt/fcmp/fclass/sgnj 9 cycles) */
   {COSTS_N_INSNS (11), COSTS_N_INSNS (11)},	/* fp_mul (fmul 11 cycles) */
   {COSTS_N_INSNS (29), COSTS_N_INSNS (29)},	/* fp_div (fdiv 29 cycles for both SF/DF) */
@@ -665,7 +665,7 @@ static const struct riscv_tune_param alioth_tune_info = {
 };
 
 // 简单静态预测：Backward Taken, Forward Not Taken
-bool alioth_branch_predicted_p (rtx_insn *insn)
+bool alkaid_branch_predicted_p (rtx_insn *insn)
 {
   if (!insn || !JUMP_P (insn))
     return false;

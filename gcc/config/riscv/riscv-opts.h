@@ -59,7 +59,7 @@ enum riscv_microarchitecture_type {
   sifive_p600,
   xiangshan,
   generic_ooo,
-  alioth
+  alkaid
 };
 extern enum riscv_microarchitecture_type riscv_microarchitecture;
 
