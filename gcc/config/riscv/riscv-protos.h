@@ -882,6 +882,7 @@ int get_gr2vr_cost ();
 int get_vr2gr_cost ();
 int get_fr2vr_cost ();
 int get_vr2fr_cost ();
+extern bool alkaid_branch_predicted_p (rtx_insn *insn);
 
 enum
 {

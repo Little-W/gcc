@@ -713,6 +713,56 @@ static const struct riscv_tune_param optimize_size_tune_info = {
   false,					/* prefer-agnostic.  */
 };
 
+/* Costs to use when optimizing for alkaid (rv64im).  */
+static const struct riscv_tune_param alkaid_tune_info = {
+  {COSTS_N_INSNS (9),  COSTS_N_INSNS (9)},	/* fp_add (fadd/fsub/fmax/fcvt/fcmp/fclass/sgnj 9 cycles) */
+  {COSTS_N_INSNS (11), COSTS_N_INSNS (11)},	/* fp_mul (fmul 11 cycles) */
+  {COSTS_N_INSNS (29), COSTS_N_INSNS (29)},	/* fp_div (fdiv 29 cycles for both SF/DF) */
+  {COSTS_N_INSNS (4),  COSTS_N_INSNS (4)},	/* int_mul (4 cycles) */
+  {COSTS_N_INSNS (36), COSTS_N_INSNS (36)},	/* int_div (36 cycles) */
+  1,						/* issue_rate (single issue) */
+  4,						/* branch_cost */
+  2,						/* memory_cost (load 2 cycles) */
+  3,						/* fmv_cost (fmisc 3 cycles) */
+  true,						/* slow_unaligned_access */
+  false,					/* vector_unaligned_access */
+  false,					/* use_divmod_expansion */
+  false,					/* overlap_op_by_pieces */
+  false,					/* use_zero_stride_load */
+  false,					/* speculative_sched_vsetvl */
+  RISCV_FUSE_LUI_ADDI | RISCV_FUSE_AUIPC_ADDI,  /* fusible_ops */
+  NULL,						/* vector cost */
+  NULL,						/* function_align */
+  NULL,						/* jump_align */
+  NULL,						/* loop_align */
+  false,					/* prefer-agnostic.  */
+};
+
+// 简单静态预测：Backward Taken, Forward Not Taken
+bool alkaid_branch_predicted_p (rtx_insn *insn)
+{
+  if (!insn || !JUMP_P (insn))
+    return false;
+
+  // 仅对条件分支生效；JAL/JALR/间接跳转不在此函数判断范围
+  enum attr_type ty = get_attr_type (insn);
+  if (ty != TYPE_BRANCH)
+    return false;
+
+  rtx label = JUMP_LABEL (insn);
+  if (!label)
+    return false;
+
+  basic_block bb_src = BLOCK_FOR_INSN (insn);
+  basic_block bb_dst = BLOCK_FOR_INSN (label);
+
+  if (!bb_src || !bb_dst)
+    return false;
+
+  // 目的基本块编号小于等于当前块 -> 视为“后向”分支（预测 taken）
+  return (bb_dst->index <= bb_src->index);
+}
+
 /* Costs to use when optimizing for MIPS P8700 */
 static const struct riscv_tune_param mips_p8700_tune_info = {
   {COSTS_N_INSNS (4), COSTS_N_INSNS (4)},	/* fp_add */
