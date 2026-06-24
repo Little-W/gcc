@@ -5,6 +5,16 @@
 ;; issue.  Integer multiply and divide are single non-pipelined instances.
 ;; The RTL implements Zba/Zbs and selected Zbb-like ALU operations, but not
 ;; the complete Zbb extension.
+;;
+;; Latencies below distinguish normal register-file availability from explicit
+;; bypass paths:
+;; - ALU results can feed ALU/branch/MUL/store-data one cycle after issue, but
+;;   load/store address generation sees them through the registered AGU
+;;   forward path.
+;; - Load data can feed ALU/branch/store-data on the live LSU bypass.  A later
+;;   load/store address use waits for the registered AGU forward path.
+;; - MUL results can feed ALU/branch/MUL/store-data on the live MUL bypass;
+;;   memory addresses wait for normal writeback.
 (define_cpu_unit "alkaid_issue"   "alkaid")
 (define_cpu_unit "alkaid_alu"     "alkaid")
 (define_cpu_unit "alkaid_imul"    "alkaid")
@@ -17,17 +27,17 @@
 (define_cpu_unit "alkaid_lsu_wr"  "alkaid")
 
 ;; ALU, shifts, bitmanip, CSR-style integer results.
-(define_insn_reservation "alkaid_alu" 1
+(define_insn_reservation "alkaid_alu" 2
   (and (eq_attr "tune" "alkaid")
        (eq_attr "type"
-         "unknown,const,arith,shift,slt,multi,auipc,nop,logical,move,bitmanip,rotate,min,max,minu,maxu,clz,ctz,atomic,condmove,mvpair,zicond"))
-  "alkaid_issue+alkaid_alu+alkaid_wb_pipe")
+         "unknown,const,arith,shift,slt,multi,auipc,nop,logical,move,bitmanip,rotate,min,max,minu,maxu,clz,ctz,atomic,condmove,mvpair,zicond,sfb_alu"))
+  "alkaid_issue+alkaid_alu,alkaid_wb_pipe")
 
 ;; TCM-hit load model.  AXI/uncached accesses are variable latency in RTL.
-(define_insn_reservation "alkaid_load" 2
+(define_insn_reservation "alkaid_load" 3
   (and (eq_attr "tune" "alkaid")
        (eq_attr "type" "load"))
-  "alkaid_issue+alkaid_lsu_rd,alkaid_wb_pipe")
+  "alkaid_issue+alkaid_lsu_rd,nothing,alkaid_wb_pipe")
 
 ;; Stores enter the LSU write path and can be buffered.
 (define_insn_reservation "alkaid_store" 1
@@ -106,11 +116,24 @@
   "alkaid_issue,alkaid_issue,alkaid_issue,alkaid_issue,alkaid_issue,alkaid_issue,alkaid_issue")
 
 ;; Integer multiply is a single non-pipelined 16x16 segmented multiplier.
-;; RV64 full-width multiplies take the ROW+RESULT path; MULW/low RV32 forms
-;; can complete earlier, but GCC schedules the common imul type at 3 cycles.
-(define_insn_reservation "alkaid_imul" 3
+;; SImode MULW/RV32 low forms use the FAST_RESULT path; DImode RV64 full-width
+;; multiplies use the ROW+RESULT path.
+(define_insn_reservation "alkaid_imulsi" 3
   (and (eq_attr "tune" "alkaid")
-       (eq_attr "type" "imul"))
+       (and (eq_attr "type" "imul")
+            (eq_attr "mode" "SI")))
+  "alkaid_issue+alkaid_imul,alkaid_imul+alkaid_wb_pipe")
+
+(define_insn_reservation "alkaid_imuldi" 4
+  (and (eq_attr "tune" "alkaid")
+       (and (eq_attr "type" "imul")
+            (eq_attr "mode" "DI")))
+  "alkaid_issue+alkaid_imul,alkaid_imul,alkaid_imul+alkaid_wb_pipe")
+
+(define_insn_reservation "alkaid_imul" 4
+  (and (eq_attr "tune" "alkaid")
+       (and (eq_attr "type" "imul")
+            (not (eq_attr "mode" "SI,DI"))))
   "alkaid_issue+alkaid_imul,alkaid_imul,alkaid_imul+alkaid_wb_pipe")
 
 ;; Integer divide is a single non-pipelined restoring divider.  Non-zero word
@@ -127,6 +150,40 @@
        (and (eq_attr "type" "idiv")
             (eq_attr "mode" "DI")))
   "alkaid_issue+alkaid_idiv,alkaid_idiv*64,alkaid_idiv+alkaid_wb_pipe")
+
+;; Explicit bypasses modeled from dispatch.sv/hdu.sv:
+;; - ALU bank bypass feeds ALU/BJP/MUL consumers and store data.
+;; - LSU live bypass feeds ALU/BJP consumers and store data, not MUL.
+;; - MUL live bypass feeds ALU/BJP/MUL consumers and store data.
+;; Store-address and load-address dependencies intentionally use the default
+;; reservation latency rather than the store-data bypass.
+(define_bypass 1 "alkaid_alu"
+  "alkaid_alu,alkaid_branch_pred,alkaid_branch_nopred,
+   alkaid_jump_wb_jalr,alkaid_ret,alkaid_imulsi,alkaid_imuldi,alkaid_imul")
+
+(define_bypass 1 "alkaid_alu"
+  "alkaid_store" "riscv_store_data_bypass_p")
+
+(define_bypass 2 "alkaid_load"
+  "alkaid_alu,alkaid_branch_pred,alkaid_branch_nopred,
+   alkaid_jump_wb_jalr,alkaid_ret")
+
+(define_bypass 2 "alkaid_load"
+  "alkaid_store" "riscv_store_data_bypass_p")
+
+(define_bypass 2 "alkaid_imulsi"
+  "alkaid_alu,alkaid_branch_pred,alkaid_branch_nopred,
+   alkaid_jump_wb_jalr,alkaid_ret,alkaid_imulsi,alkaid_imuldi,alkaid_imul")
+
+(define_bypass 2 "alkaid_imulsi"
+  "alkaid_store" "riscv_store_data_bypass_p")
+
+(define_bypass 3 "alkaid_imuldi,alkaid_imul"
+  "alkaid_alu,alkaid_branch_pred,alkaid_branch_nopred,
+   alkaid_jump_wb_jalr,alkaid_ret,alkaid_imulsi,alkaid_imuldi,alkaid_imul")
+
+(define_bypass 3 "alkaid_imuldi,alkaid_imul"
+  "alkaid_store" "riscv_store_data_bypass_p")
 
 ;; Floating-point fallback rules.  The present Alkaid RTL does not decode F/D.
 (define_insn_reservation "alkaid_fmisc" 3
