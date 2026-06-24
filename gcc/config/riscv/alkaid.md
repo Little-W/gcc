@@ -1,41 +1,41 @@
 (define_automaton "alkaid")
 
-;; ---------------------------
-;; Pipeline resources
-;; ---------------------------
-(define_cpu_unit "alkaid_issue"  "alkaid")  ;; 前端/发射资源（模拟取指/重定向停顿）
-(define_cpu_unit "alkaid_alu"    "alkaid")  ;; ALU 执行资源
-(define_cpu_unit "alkaid_idiv0"  "alkaid")
-(define_cpu_unit "alkaid_idiv1"  "alkaid")
-(define_cpu_unit "alkaid_fpu"    "alkaid")
+;; The current Alkaid RTL is a single-dispatch core with a four-entry
+;; commit-id scoreboard and a one-entry wait queue for limited out-of-order
+;; issue.  Integer multiply and divide are single non-pipelined instances.
+;; The RTL implements Zba/Zbs and selected Zbb-like ALU operations, but not
+;; the complete Zbb extension.
+(define_cpu_unit "alkaid_issue"   "alkaid")
+(define_cpu_unit "alkaid_alu"     "alkaid")
+(define_cpu_unit "alkaid_imul"    "alkaid")
+(define_cpu_unit "alkaid_idiv"    "alkaid")
+;; No hardware FPU exists in the current RTL; keep these as fallback costs for
+;; externally supplied FP implementations or hand-selected -march values.
+(define_cpu_unit "alkaid_fpu"     "alkaid")
 (define_cpu_unit "alkaid_wb_pipe" "alkaid")
-(define_cpu_unit "alkaid_lsu_rd" "alkaid")  ;; LSU 读取资源
-(define_cpu_unit "alkaid_lsu_wr" "alkaid")  ;; LSU 写入资源
+(define_cpu_unit "alkaid_lsu_rd"  "alkaid")
+(define_cpu_unit "alkaid_lsu_wr"  "alkaid")
 
-;; ---------------------------
-;; Reservations
-;; ---------------------------
-
-;; ALU/逻辑/移位/CSR 等（1-cycle，首拍占用 issue）
+;; ALU, shifts, bitmanip, CSR-style integer results.
 (define_insn_reservation "alkaid_alu" 1
   (and (eq_attr "tune" "alkaid")
        (eq_attr "type"
          "unknown,const,arith,shift,slt,multi,auipc,nop,logical,move,bitmanip,rotate,min,max,minu,maxu,clz,ctz,atomic,condmove,mvpair,zicond"))
   "alkaid_issue+alkaid_alu+alkaid_wb_pipe")
 
-;; Load（两拍返回；第 2 拍写回）
+;; TCM-hit load model.  AXI/uncached accesses are variable latency in RTL.
 (define_insn_reservation "alkaid_load" 2
   (and (eq_attr "tune" "alkaid")
        (eq_attr "type" "load"))
   "alkaid_issue+alkaid_lsu_rd,alkaid_wb_pipe")
 
-;; Store（1 拍；仅占用 issue 和 lsu 写入）
+;; Stores enter the LSU write path and can be buffered.
 (define_insn_reservation "alkaid_store" 1
   (and (eq_attr "tune" "alkaid")
        (eq_attr "type" "store"))
   "alkaid_issue+alkaid_lsu_wr")
 
-;; 单精度浮点读写（与整数一致）
+;; Floating-point load/store fallback rules.
 (define_insn_reservation "alkaid_fpload_sf" 2
   (and (eq_attr "tune" "alkaid")
        (and (eq_attr "type" "fpload")
@@ -48,86 +48,87 @@
             (eq_attr "mode" "SF")))
   "alkaid_issue+alkaid_lsu_wr")
 
-;; 双精度浮点读取（2 周期 lsu_rd + 1 周期 wb_pipe）
 (define_insn_reservation "alkaid_fpload_df" 3
   (and (eq_attr "tune" "alkaid")
        (and (eq_attr "type" "fpload")
             (eq_attr "mode" "DF")))
   "alkaid_issue+alkaid_lsu_rd,nothing,alkaid_wb_pipe")
 
-;; 双精度浮点写入（2 周期 lsu_wr）
 (define_insn_reservation "alkaid_fpstore_df" 2
   (and (eq_attr "tune" "alkaid")
        (and (eq_attr "type" "fpstore")
             (eq_attr "mode" "DF")))
   "alkaid_issue+alkaid_lsu_wr,alkaid_lsu_wr")
 
-;; 通用浮点读取保底规则（覆盖其他模式）
 (define_insn_reservation "alkaid_fpload_generic" 2
   (and (eq_attr "tune" "alkaid")
        (eq_attr "type" "fpload"))
   "alkaid_issue+alkaid_lsu_rd,alkaid_wb_pipe")
 
-;; 通用浮点写入保底规则（覆盖其他模式）
 (define_insn_reservation "alkaid_fpstore_generic" 1
   (and (eq_attr "tune" "alkaid")
        (eq_attr "type" "fpstore"))
   "alkaid_issue+alkaid_lsu_wr")
 
-;; ---- 控制转移：按重定向气泡建模 ----
-
-;; 被预测覆盖的 branch：无额外停顿（仅 1 拍占用 issue）
+;; Branch costs model front-end redirect bubbles.  The RTL predictor combines
+;; a static baseline with BHT/loop/correlation predictors; GCC can only model
+;; the static side here.
 (define_insn_reservation "alkaid_branch_pred" 1
   (and (eq_attr "tune" "alkaid")
        (and (eq_attr "type" "branch")
             (match_test "alkaid_branch_predicted_p (insn)")))
   "alkaid_issue")
 
-;; 未被预测覆盖的 branch：4-cycle 前端停顿
 (define_insn_reservation "alkaid_branch_nopred" 4
   (and (eq_attr "tune" "alkaid")
        (and (eq_attr "type" "branch")
             (match_test "!alkaid_branch_predicted_p (insn)")))
   "alkaid_issue,alkaid_issue,alkaid_issue,alkaid_issue")
 
-;; jal：需要写回 rd（PC+4），并造成 1-cycle 前端停顿
 (define_insn_reservation "alkaid_jump_wb_jal" 2
   (and (eq_attr "tune" "alkaid")
        (eq_attr "type" "jump"))
   "alkaid_issue+alkaid_alu,alkaid_wb_pipe")
 
-;; jalr / call：需要写回，且 4-cycle 前端停顿
 (define_insn_reservation "alkaid_jump_wb_jalr" 4
   (and (eq_attr "tune" "alkaid")
        (eq_attr "type" "jalr,call"))
   "alkaid_issue+alkaid_alu,alkaid_wb_pipe+alkaid_issue,alkaid_issue,alkaid_issue")
 
-;; ret：与 jalr 类似，4-cycle 前端停顿+写回
 (define_insn_reservation "alkaid_ret" 4
   (and (eq_attr "tune" "alkaid")
        (eq_attr "type" "ret"))
   "alkaid_issue+alkaid_alu,alkaid_wb_pipe+alkaid_issue,alkaid_issue,alkaid_issue")
 
-;; trap（ecall/ebreak）：与未预测分支类似，7-cycle 前端停顿
 (define_insn_reservation "alkaid_trap" 7
   (and (eq_attr "tune" "alkaid")
        (eq_attr "type" "trap"))
   "alkaid_issue,alkaid_issue,alkaid_issue,alkaid_issue,alkaid_issue,alkaid_issue,alkaid_issue")
 
-;; Integer Multiply（4-cycle，可流水；首拍占 issue）
-(define_insn_reservation "alkaid_imul" 4
+;; Integer multiply is a single non-pipelined 16x16 segmented multiplier.
+;; RV64 full-width multiplies take the ROW+RESULT path; MULW/low RV32 forms
+;; can complete earlier, but GCC schedules the common imul type at 3 cycles.
+(define_insn_reservation "alkaid_imul" 3
   (and (eq_attr "tune" "alkaid")
        (eq_attr "type" "imul"))
-  "alkaid_issue,nothing*2,alkaid_wb_pipe")
+  "alkaid_issue+alkaid_imul,alkaid_imul,alkaid_imul+alkaid_wb_pipe")
 
-;; Integer Divide (32-bit)（两单元互斥；首拍占 issue）
-(define_insn_reservation "alkaid_idivsi" 36
+;; Integer divide is a single non-pipelined restoring divider.  Non-zero word
+;; operations take START + 32 CALC + END cycles; full RV64 operations take
+;; START + 64 CALC + END.  Divide-by-zero is a fast path that is not modeled.
+(define_insn_reservation "alkaid_idivsi" 34
   (and (eq_attr "tune" "alkaid")
        (and (eq_attr "type" "idiv")
             (eq_attr "mode" "SI")))
-  "alkaid_issue,(alkaid_idiv0*34|alkaid_idiv1*34),alkaid_wb_pipe")
+  "alkaid_issue+alkaid_idiv,alkaid_idiv*32,alkaid_idiv+alkaid_wb_pipe")
 
-;; 浮点类（首拍占 issue）
+(define_insn_reservation "alkaid_idivdi" 66
+  (and (eq_attr "tune" "alkaid")
+       (and (eq_attr "type" "idiv")
+            (eq_attr "mode" "DI")))
+  "alkaid_issue+alkaid_idiv,alkaid_idiv*64,alkaid_idiv+alkaid_wb_pipe")
+
+;; Floating-point fallback rules.  The present Alkaid RTL does not decode F/D.
 (define_insn_reservation "alkaid_fmisc" 3
   (and (eq_attr "tune" "alkaid")
        (eq_attr "type" "mfc,mtc,fmove,fcmp"))

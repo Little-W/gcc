@@ -713,17 +713,18 @@ static const struct riscv_tune_param optimize_size_tune_info = {
   false,					/* prefer-agnostic.  */
 };
 
-/* Costs to use when optimizing for alkaid (rv64im).  */
+/* Costs to use when optimizing for alkaid
+   (RV64IM_ZICSR_ZIFENCEI_ZBA_ZBS, single-dispatch limited OoO).  */
 static const struct riscv_tune_param alkaid_tune_info = {
-  {COSTS_N_INSNS (9),  COSTS_N_INSNS (9)},	/* fp_add (fadd/fsub/fmax/fcvt/fcmp/fclass/sgnj 9 cycles) */
-  {COSTS_N_INSNS (11), COSTS_N_INSNS (11)},	/* fp_mul (fmul 11 cycles) */
-  {COSTS_N_INSNS (29), COSTS_N_INSNS (29)},	/* fp_div (fdiv 29 cycles for both SF/DF) */
-  {COSTS_N_INSNS (4),  COSTS_N_INSNS (4)},	/* int_mul (4 cycles) */
-  {COSTS_N_INSNS (36), COSTS_N_INSNS (36)},	/* int_div (36 cycles) */
-  1,						/* issue_rate (single issue) */
+  {COSTS_N_INSNS (9),  COSTS_N_INSNS (9)},	/* fp_add fallback */
+  {COSTS_N_INSNS (11), COSTS_N_INSNS (11)},	/* fp_mul fallback */
+  {COSTS_N_INSNS (29), COSTS_N_INSNS (29)},	/* fp_div fallback */
+  {COSTS_N_INSNS (3),  COSTS_N_INSNS (3)},	/* int_mul */
+  {COSTS_N_INSNS (34), COSTS_N_INSNS (66)},	/* int_div */
+  1,						/* issue_rate */
   4,						/* branch_cost */
-  2,						/* memory_cost (load 2 cycles) */
-  3,						/* fmv_cost (fmisc 3 cycles) */
+  2,						/* memory_cost */
+  3,						/* fmv_cost fallback */
   true,						/* slow_unaligned_access */
   false,					/* vector_unaligned_access */
   false,					/* use_divmod_expansion */
@@ -738,13 +739,14 @@ static const struct riscv_tune_param alkaid_tune_info = {
   false,					/* prefer-agnostic.  */
 };
 
-// 简单静态预测：Backward Taken, Forward Not Taken
+/* Model the static baseline of the RTL branch predictor.  Dynamic BHT, loop,
+   correlation, JALR target cache, and RAS state cannot be represented here.
+   Static taken means backward branches plus forward BNE/BGEU.  */
 bool alkaid_branch_predicted_p (rtx_insn *insn)
 {
   if (!insn || !JUMP_P (insn))
     return false;
 
-  // 仅对条件分支生效；JAL/JALR/间接跳转不在此函数判断范围
   enum attr_type ty = get_attr_type (insn);
   if (ty != TYPE_BRANCH)
     return false;
@@ -759,8 +761,17 @@ bool alkaid_branch_predicted_p (rtx_insn *insn)
   if (!bb_src || !bb_dst)
     return false;
 
-  // 目的基本块编号小于等于当前块 -> 视为“后向”分支（预测 taken）
-  return (bb_dst->index <= bb_src->index);
+  bool backward = bb_dst->index <= bb_src->index;
+
+  bool forward_likely = false;
+  rtx set = pc_set (insn);
+  if (set && GET_CODE (SET_SRC (set)) == IF_THEN_ELSE)
+    {
+      enum rtx_code code = GET_CODE (XEXP (SET_SRC (set), 0));
+      forward_likely = code == NE || code == GEU;
+    }
+
+  return backward || forward_likely;
 }
 
 /* Costs to use when optimizing for MIPS P8700 */
