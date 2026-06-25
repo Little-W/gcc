@@ -387,7 +387,8 @@
 				      (const_int 0)))
    (set (match_dup 0) (ior:X (match_dup 5) (match_dup 4)))]
   "operands[4] = gen_reg_rtx (word_mode);
-   operands[5] = gen_reg_rtx (word_mode);")
+   operands[5] = gen_reg_rtx (word_mode);"
+  [(set_attr "type" "zicond")])
 
 ;; Same thing, but with operand order reversed
 (define_insn_and_split "conditional_rand<mode>"
@@ -411,5 +412,5 @@
 				      (const_int 0)))
    (set (match_dup 0) (ior:X (match_dup 5) (match_dup 4)))]
   "operands[4] = gen_reg_rtx (word_mode);
-   operands[5] = gen_reg_rtx (word_mode);")
-
+   operands[5] = gen_reg_rtx (word_mode);"
+  [(set_attr "type" "zicond")])
