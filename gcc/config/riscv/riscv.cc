@@ -12446,6 +12446,14 @@ riscv_option_override (void)
   if (flag_pic)
     g_switch_value = 0;
 
+  /* Alkaid RV64 software normally runs from a high physical map, where the
+     medlow absolute HI20 relocations are not a good default.  */
+  const struct riscv_tune_info *default_tune
+    = riscv_parse_tune (get_tune_str (&global_options), false);
+  if (TARGET_64BIT && default_tune->microarchitecture == alkaid)
+    SET_OPTION_IF_UNSET (&global_options, &global_options_set,
+			 riscv_cmodel, CM_MEDANY);
+
   /* Always prefer medlow than medany for RV32 since medlow can access
      full address space. */
   if (riscv_cmodel == CM_LARGE && !TARGET_64BIT)
