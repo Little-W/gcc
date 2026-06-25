@@ -94,4 +94,6 @@ by particular CPU name. Permissible values for this option are:
 
 @samp{andes-ax45},
 
-@samp{spacemit-x60}.
+@samp{spacemit-x60},
+
+@samp{alkaid}.

@@ -747,12 +747,10 @@ bool alkaid_branch_predicted_p (rtx_insn *insn)
   if (!insn || !JUMP_P (insn))
     return false;
 
-  enum attr_type ty = get_attr_type (insn);
-  if (ty != TYPE_BRANCH)
-    return false;
-
+  /* The MD reservation already filters type=branch; do not query attributes
+     here because scheduling attribute evaluation can re-enter this helper.  */
   rtx label = JUMP_LABEL (insn);
-  if (!label)
+  if (!label || !LABEL_P (label))
     return false;
 
   basic_block bb_src = BLOCK_FOR_INSN (insn);
@@ -767,7 +765,8 @@ bool alkaid_branch_predicted_p (rtx_insn *insn)
   rtx set = pc_set (insn);
   if (set && GET_CODE (SET_SRC (set)) == IF_THEN_ELSE)
     {
-      enum rtx_code code = GET_CODE (XEXP (SET_SRC (set), 0));
+      rtx cond = XEXP (SET_SRC (set), 0);
+      enum rtx_code code = GET_CODE (cond);
       forward_likely = code == NE || code == GEU;
     }
 

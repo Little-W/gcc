@@ -54,6 +54,8 @@ particular CPU name.  Permissible values for this option are:
 
 @samp{generic-ooo},
 
+@samp{alkaid},
+
 @samp{size},
 
 @samp{mips-p8700},
