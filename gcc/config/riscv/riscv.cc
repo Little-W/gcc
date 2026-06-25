@@ -11072,30 +11072,18 @@ riscv_sched_variable_issue (FILE *, int, rtx_insn *insn, int more)
   if (code == USE || code == CLOBBER)
     return more;
 
-  enum attr_type type = get_attr_type (insn);
-
   /* GHOST insns are used for blockage and similar cases which
      effectively end a cycle.  */
-  if (type == TYPE_GHOST)
+  if (get_attr_type (insn) == TYPE_GHOST)
     return 0;
 
-  /* Alkaid has a catch-all scalar reservation for backend patterns that keep
-     TYPE_UNKNOWN.  Do not turn those patterns into an ICE.  */
-  if (type == TYPE_UNKNOWN)
-    {
-      if (riscv_microarchitecture == alkaid)
-	return more - 1;
-      gcc_unreachable ();
-    }
+  /* If we ever encounter an insn with an unknown type, trip
+     an assert so we can find and fix this problem.  */
+  gcc_assert (get_attr_type (insn) != TYPE_UNKNOWN);
 
-  /* Keep the normal strict check for upstream tunes, but let alkaid fall back
-     to consuming one issue slot while its tune model is still being refined.  */
-  if (!insn_has_dfa_reservation_p (insn))
-    {
-      if (riscv_microarchitecture == alkaid)
-	return more - 1;
-      gcc_unreachable ();
-    }
+  /* If we ever encounter an insn without an insn reservation, trip
+     an assert so we can find and fix this problem.  */
+  gcc_assert (insn_has_dfa_reservation_p (insn));
 
   /* If this is a vector insn with vl/vtype info, then record the last
      vector configuration.  */
