@@ -12352,6 +12352,10 @@ riscv_override_options_internal (struct gcc_options *opts)
 		 ? &optimize_size_tune_info
 		 : cpu->tune_param;
 
+  /* Alkaid prefers local branch tails over crossjumped shared tails.  */
+  if (riscv_microarchitecture == alkaid)
+    SET_OPTION_IF_UNSET (opts, &global_options_set, flag_crossjumping, 0);
+
   /* If not optimizing for size, set the default
       alignment to what the target wants.  */
   if (!opts->x_optimize_size)
