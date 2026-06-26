@@ -197,7 +197,7 @@ RISCV_CORE("spacemit-x60",    "rv64imafdcv_zba_zbb_zbc_zbs_zicboz_zicond_"
 			      "zbkc_zfh_zvfh_zvkt_zvl256b_sscofpmf_xsmtvdot",
 			      "spacemit-x60")
 
-RISCV_CORE("alkaid",          "rv64im_zicsr_zifencei_zba_zbs",
+RISCV_CORE("alkaid",          "rv64imac_zicsr_zifencei_zba_zbb_zbs",
 			      "alkaid")
 
 #undef RISCV_CORE

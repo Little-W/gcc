@@ -4,8 +4,9 @@
 ;; commit-id scoreboard and a one-entry wait queue for limited out-of-order
 ;; issue.  Integer multiply and divide are single non-pipelined instances;
 ;; their RV64 implementations are iterative.
-;; The RTL implements Zba/Zbs and selected Zbb-like ALU operations, but not
-;; the complete Zbb extension.
+;; The RTL implements A/C/Zba/Zbb/Zbs.  Compressed instructions are expanded
+;; in the front end before decode, while atomics use the LSU read-modify-write
+;; path.
 ;;
 ;; Latencies below distinguish normal register-file availability from explicit
 ;; bypass paths:
@@ -31,7 +32,7 @@
 (define_insn_reservation "alkaid_alu" 2
   (and (eq_attr "tune" "alkaid")
        (eq_attr "type"
-         "unknown,const,arith,shift,slt,multi,auipc,nop,logical,move,bitmanip,rotate,min,max,minu,maxu,clz,ctz,atomic,condmove,mvpair,zicond,sfb_alu"))
+         "unknown,const,arith,shift,slt,multi,auipc,nop,logical,move,bitmanip,rotate,min,max,minu,maxu,clz,ctz,condmove,mvpair,zicond,sfb_alu"))
   "alkaid_issue+alkaid_alu,alkaid_wb_pipe")
 
 ;; RV64/Zbb population count is modeled as an ALU-style scalar operation so
@@ -52,6 +53,14 @@
   (and (eq_attr "tune" "alkaid")
        (eq_attr "type" "store"))
   "alkaid_issue+alkaid_lsu_wr")
+
+;; AMO/LR/SC use the LSU atomic state machine.  A TCM hit takes a read phase
+;; and, for SC/AMO operations, a write phase before the old value or status is
+;; written back; AXI/uncached accesses remain variable latency.
+(define_insn_reservation "alkaid_atomic" 6
+  (and (eq_attr "tune" "alkaid")
+       (eq_attr "type" "atomic"))
+  "alkaid_issue+alkaid_lsu_rd,alkaid_lsu_rd,alkaid_lsu_wr,alkaid_lsu_wr,nothing,alkaid_wb_pipe")
 
 ;; Floating-point load/store fallback rules.
 (define_insn_reservation "alkaid_fpload_sf" 2
@@ -144,8 +153,8 @@
             (not (eq_attr "mode" "SI,DI"))))
   "alkaid_issue+alkaid_imul,alkaid_imul*16,alkaid_imul+alkaid_wb_pipe")
 
-;; Carry-less multiply appears as a separate GCC scheduling type when the full
-;; B extension is selected.  Model it on the RV64 iterative multiply resource.
+;; Zbc/CLMUL is not in the default Alkaid ISA string; keep a defensive
+;; reservation if it is selected explicitly with -march.
 (define_insn_reservation "alkaid_clmul" 18
   (and (eq_attr "tune" "alkaid")
        (eq_attr "type" "clmul"))
