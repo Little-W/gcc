@@ -719,7 +719,7 @@ static const struct riscv_tune_param alkaid_tune_info = {
   {COSTS_N_INSNS (9),  COSTS_N_INSNS (9)},	/* fp_add fallback */
   {COSTS_N_INSNS (11), COSTS_N_INSNS (11)},	/* fp_mul fallback */
   {COSTS_N_INSNS (29), COSTS_N_INSNS (29)},	/* fp_div fallback */
-  {COSTS_N_INSNS (2),  COSTS_N_INSNS (3)},	/* int_mul */
+  {COSTS_N_INSNS (3),  COSTS_N_INSNS (18)},	/* int_mul */
   {COSTS_N_INSNS (34), COSTS_N_INSNS (130)},	/* int_div */
   1,						/* issue_rate */
   4,						/* branch_cost */

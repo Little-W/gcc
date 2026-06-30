@@ -9,7 +9,10 @@
 ;; path.
 ;;
 ;; Latencies below distinguish normal register-file availability from explicit
-;; bypass paths:
+;; bypass paths.  Keep long-latency MUL/DIV resource reservations compact:
+;; their dependency latency is represented by the reservation latency number,
+;; while the DFA only tracks issue/writeback resources.  This keeps GCC's
+;; generated scheduler automaton small enough for CI builds.
 ;; - ALU results can feed ALU/branch/MUL/store-data one cycle after issue, but
 ;;   load/store address generation sees them through the registered AGU
 ;;   forward path.
@@ -145,20 +148,20 @@
   (and (eq_attr "tune" "alkaid")
        (and (eq_attr "type" "imul")
             (eq_attr "mode" "DI")))
-  "alkaid_issue+alkaid_imul,alkaid_imul*16,alkaid_imul+alkaid_wb_pipe")
+  "alkaid_issue+alkaid_imul,alkaid_wb_pipe")
 
 (define_insn_reservation "alkaid_imul" 18
   (and (eq_attr "tune" "alkaid")
        (and (eq_attr "type" "imul")
             (not (eq_attr "mode" "SI,DI"))))
-  "alkaid_issue+alkaid_imul,alkaid_imul*16,alkaid_imul+alkaid_wb_pipe")
+  "alkaid_issue+alkaid_imul,alkaid_wb_pipe")
 
 ;; Zbc/CLMUL is not in the default Alkaid ISA string; keep a defensive
 ;; reservation if it is selected explicitly with -march.
 (define_insn_reservation "alkaid_clmul" 18
   (and (eq_attr "tune" "alkaid")
        (eq_attr "type" "clmul"))
-  "alkaid_issue+alkaid_imul,alkaid_imul*16,alkaid_imul+alkaid_wb_pipe")
+  "alkaid_issue+alkaid_imul,alkaid_wb_pipe")
 
 ;; Integer divide is a single non-pipelined restoring divider.  RV32 performs
 ;; one step per quotient bit.  RV64 performs low/high half steps per quotient
@@ -169,13 +172,13 @@
   (and (eq_attr "tune" "alkaid")
        (and (eq_attr "type" "idiv")
             (eq_attr "mode" "SI")))
-  "alkaid_issue+alkaid_idiv,alkaid_idiv*32,alkaid_idiv+alkaid_wb_pipe")
+  "alkaid_issue+alkaid_idiv,alkaid_wb_pipe")
 
 (define_insn_reservation "alkaid_idivdi" 130
   (and (eq_attr "tune" "alkaid")
        (and (eq_attr "type" "idiv")
             (eq_attr "mode" "DI")))
-  "alkaid_issue+alkaid_idiv,alkaid_idiv*128,alkaid_idiv+alkaid_wb_pipe")
+  "alkaid_issue+alkaid_idiv,alkaid_wb_pipe")
 
 ;; Explicit bypasses modeled from dispatch.sv/hdu.sv:
 ;; - ALU bank bypass feeds ALU/BJP/MUL consumers and store data.
